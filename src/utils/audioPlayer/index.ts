@@ -1,194 +1,131 @@
+export interface AudioSettings {
+  loop: boolean;
+  aToB: { a: number | null; b: number | null };
+  volume: number;
+  muted: boolean;
+  playbackRate: number;
+}
+
 class AudioPlayer {
-  private audio: HTMLAudioElement;
-  private aToB: {
-    a: number;
-    b: number;
-  } = { a: 0, b: 0 };
-  private isLooping = false;
-  private onTimeUpdateCallback: ((time: number) => void)[] = [];
-  private onEndedCallback: (() => void)[] = [];
-  private onPlayCallback: (() => void)[] = [];
-  private onPauseCallback: (() => void)[] = [];
-  private onStopCallback: (() => void)[] = [];
-  private onDurationChangeCallback: ((duration: number) => void)[] = [];
-  private onVolumeChangeCallback: ((volume: number) => void)[] = [];
-  private onMutedChangeCallback: ((muted: boolean) => void)[] = [];
-  private onPlaybackRateChangeCallback: ((rate: number) => void)[] = [];
-  private onLoopChangeCallback: ((loop: boolean) => void)[] = [];
-  private onAtoBChangeCallback: ((aToB: { a: number; b: number }) => void)[] =
-    [];
-  public isPlaying = false;
-  public currentTime = 0;
-  constructor(
-    audioFile: File,
-    configs?: {
-      init: boolean;
-      onTimeUpdate: (time: number) => void;
-      onEnded: () => void;
-      onPlay: () => void;
-      onPause: () => void;
-      onStop: () => void;
-      onDurationChange: (duration: number) => void;
-      onVolumeChange: (volume: number) => void;
-      onMutedChange: (muted: boolean) => void;
-      onPlaybackRateChange: (rate: number) => void;
-      onLoopChange: (loop: boolean) => void;
-      onAtoBChange: (aToB: { a: number; b: number }) => void;
-    }
-  ) {
-    this.audio = new Audio(URL.createObjectURL(audioFile));
-
-    if (configs?.onTimeUpdate) {
-      this.onTimeUpdateCallback.push(configs.onTimeUpdate);
-    }
-
-    if (configs?.onEnded) {
-      this.onEndedCallback.push(configs.onEnded);
-    }
-
-    if (configs?.onPlay) {
-      this.onPlayCallback.push(configs.onPlay);
-    }
-
-    if (configs?.onPause) {
-      this.onPauseCallback.push(configs.onPause);
-    }
-
-    if (configs?.onStop) {
-      this.onStopCallback.push(configs.onStop);
-    }
-
-    if (configs?.onDurationChange) {
-      this.onDurationChangeCallback.push(configs.onDurationChange);
-    }
-
-    if (configs?.onVolumeChange) {
-      this.onVolumeChangeCallback.push(configs.onVolumeChange);
-    }
-
-    if (configs?.onMutedChange) {
-      this.onMutedChangeCallback.push(configs.onMutedChange);
-    }
-
-    if (configs?.onPlaybackRateChange) {
-      this.onPlaybackRateChangeCallback.push(configs.onPlaybackRateChange);
-    }
-
-    if (configs?.onLoopChange) {
-      this.onLoopChangeCallback.push(configs.onLoopChange);
-    }
-
-    if (configs?.onAtoBChange) {
-      this.onAtoBChangeCallback.push(configs.onAtoBChange);
-    }
+  private audioElement: HTMLAudioElement;
+  private settings: AudioSettings = {
+    loop: false,
+    aToB: { a: 0, b: 0 },
+    volume: 0.1,
+    muted: false,
+    playbackRate: 1,
+  };
+  private currentTime: number = 0;
+  constructor(element: HTMLAudioElement) {
+    this.audioElement = element;
+  }
+  changeSrc(src: string) {
+    this.audioElement.src = src;
+    this.init();
+  }
+  readyLoop() {
+    return (
+      this.settings.aToB.a !== null &&
+      this.settings.aToB.b !== null &&
+      this.settings.loop
+    );
   }
   init() {
-    this.audio.addEventListener("timeupdate", (e: Event) => {
-      if (this.isLooping) {
-        const target = e.target as HTMLAudioElement;
-        this.currentTime = target.currentTime;
-        if (this.currentTime >= this.aToB.b) {
-          this.audio.currentTime = this.aToB.a;
+    this.audioElement.addEventListener("timeupdate", () => {
+      this.currentTime = this.audioElement.currentTime;
+      if (this.readyLoop()) {
+        if (this.currentTime >= this.settings.aToB.b!) {
+          this.audioElement.currentTime = this.settings.aToB.a!;
+        } else if (this.currentTime <= this.settings.aToB.a!) {
+          this.audioElement.currentTime = this.settings.aToB.a!;
         }
       }
-      this.onTimeUpdateCallback.forEach((callback) =>
-        callback(this.currentTime)
-      );
     });
-    this.audio.addEventListener("ended", () => {
-      this.onEndedCallback.forEach((callback) => callback());
-    });
-    this.audio.addEventListener("play", () => {
-      this.onPlayCallback.forEach((callback) => callback());
-    });
-    this.audio.addEventListener("pause", () => {
-      this.onPauseCallback.forEach((callback) => callback());
-    });
-    this.audio.addEventListener("stop", () => {
-      this.onStopCallback.forEach((callback) => callback());
-    });
-    this.audio.addEventListener("durationchange", () => {
-      this.onDurationChangeCallback.forEach((callback) =>
-        callback(this.audio.duration)
-      );
-    });
-    this.audio.addEventListener("volumechange", () => {
-      this.onVolumeChangeCallback.forEach((callback) =>
-        callback(this.audio.volume)
-      );
-    });
-    this.audio.addEventListener("mutedchange", () => {
-      this.onMutedChangeCallback.forEach((callback) =>
-        callback(this.audio.muted)
-      );
-    });
-    this.audio.addEventListener("playbackratechange", () => {
-      this.onPlaybackRateChangeCallback.forEach((callback) =>
-        callback(this.audio.playbackRate)
-      );
-    });
-    this.audio.addEventListener("loopchange", () => {
-      this.onLoopChangeCallback.forEach((callback) => callback(this.isLooping));
-    });
-    this.audio.addEventListener("atobchange", () => {
-      this.onAtoBChangeCallback.forEach((callback) => callback(this.aToB));
+    this.audioElement.addEventListener("ended", () => {
+      if (this.readyLoop()) {
+        this.audioElement.currentTime = this.settings.aToB.a!;
+      }
     });
   }
-  play() {
-    this.audio.play();
-    this.isPlaying = true;
+  getDurationByTime(time: number) {
+    return (time / this.audioElement.duration) * 100;
   }
-  pause() {
-    this.audio.pause();
-    this.isPlaying = false;
-  }
-  stop() {
-    this.audio.pause();
-    this.audio.currentTime = 0;
-    this.isPlaying = false;
-  }
-  getDuration() {
-    return this.audio.duration;
-  }
-  getCurrentTime() {
-    return this.audio.currentTime;
-  }
-  setCurrentTime(time: number) {
-    this.audio.currentTime = time;
-  }
-  getVolume() {
-    return this.audio.volume;
-  }
-  setVolume(volume: number) {
-    this.audio.volume = volume;
-  }
-  getMuted() {
-    return this.audio.muted;
-  }
-  setMuted(muted: boolean) {
-    this.audio.muted = muted;
-  }
-  getPlaybackRate() {
-    return this.audio.playbackRate;
+  setSettings(settings: Partial<AudioSettings>) {
+    if (!this.audioElement) return;
+    this.audioElement.loop = settings.loop ?? this.settings.loop;
+    this.audioElement.volume = settings.volume ?? this.settings.volume;
+    this.audioElement.muted = settings.muted ?? this.settings.muted;
+    this.audioElement.playbackRate =
+      settings.playbackRate ?? this.settings.playbackRate;
+    this.settings = { ...this.settings, ...settings };
   }
   setPlaybackRate(rate: number) {
-    this.audio.playbackRate = rate;
+    this.settings.playbackRate = rate;
+    this.audioElement.playbackRate = rate;
   }
-  getLoop() {
-    return this.audio.loop;
+  setVolume(volume: number) {
+    this.settings.volume = volume;
+    this.audioElement.volume = volume;
+  }
+  setMuted(muted: boolean) {
+    this.settings.muted = muted;
+    this.audioElement.muted = muted;
   }
   setLoop(loop: boolean) {
-    this.audio.loop = loop;
-    this.isLooping = loop;
+    this.settings.loop = loop;
   }
-  setAtoB(target: "a" | "b" = "a") {
-    this.aToB[target] = this.getCurrentTime();
+  setA() {
+    if (
+      this.settings.aToB.b !== null && // b가 있고
+      this.currentTime >= this.settings.aToB.b // 현재 시간이 b보다 크거나 같으면
+    ) {
+      console.log(
+        this.currentTime,
+        this.settings.aToB.b,
+        "a는 b보다 크면 안됨"
+      );
+      return null;
+    }
+    if (this.settings.aToB.a !== null) {
+      console.log("a는 이미 있으므로 초기화");
+      this.settings.aToB.a = null;
+      return null;
+    }
+    this.settings.aToB.a = this.currentTime;
+    return this.getDurationByTime(this.settings.aToB.a);
   }
-  getAtoB() {
-    return this.aToB;
+  setB() {
+    if (
+      this.settings.aToB.a !== null && // a가 있고
+      this.currentTime <= this.settings.aToB.a // 현재 시간이 a보다 작거나 같으면
+    ) {
+      console.log("a는 b보다 작아야 함");
+      return null;
+    }
+    if (this.settings.aToB.b !== null) {
+      console.log("b는 이미 있으므로 초기화");
+      this.settings.aToB.b = null;
+      return null;
+    }
+    this.settings.aToB.b = this.currentTime;
+    return this.getDurationByTime(this.settings.aToB.b);
   }
-  getAtoBTime(target: "a" | "b" = "a") {
-    return this.aToB[target];
+  getSettings() {
+    return this.settings;
+  }
+  play() {
+    this.audioElement.play();
+  }
+  pause() {
+    this.audioElement.pause();
+  }
+  togglePlay() {
+    if (this.audioElement.paused) {
+      this.play();
+    } else {
+      this.pause();
+    }
+    return;
   }
 }
 

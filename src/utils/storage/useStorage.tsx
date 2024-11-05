@@ -45,7 +45,7 @@ export function useStorage<T extends Storable>(
 
   // CREATE: 데이터 추가 함수
   const addItem = useCallback(
-    async (item: Omit<T, "id">): Promise<string | null> => {
+    async (item: Omit<T, "id">): Promise<T | null> => {
       setLoading(true);
       setError(null);
       try {
@@ -54,7 +54,7 @@ export function useStorage<T extends Storable>(
         await storage.add(newItem);
         setItems((prevItems) => [...prevItems, newItem]);
         setLoading(false);
-        return id;
+        return newItem;
       } catch (e) {
         setError(e as Error);
         setLoading(false);
