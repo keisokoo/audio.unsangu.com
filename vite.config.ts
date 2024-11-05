@@ -33,6 +33,10 @@ export default defineConfig({
             handler: "NetworkFirst", // HTML 문서를 네트워크에서 먼저 시도하고, 실패 시 캐시된 파일을 사용
             options: {
               cacheName: "html-cache",
+              // networkTimeoutSeconds: 5, // 네트워크 응답이 5초 내로 없으면 캐시 사용
+              // expiration: {
+              //   maxEntries: 10, // 최대 10개의 HTML 파일을 캐시에 저장
+              // },
             },
           },
           {
@@ -41,6 +45,9 @@ export default defineConfig({
             handler: "StaleWhileRevalidate", // CSS, JS 파일들은 네트워크와 캐시 둘 다 시도해서 최신을 유지
             options: {
               cacheName: "assets-cache",
+              // expiration: {
+              //   maxEntries: 50,
+              // },
             },
           },
           {
