@@ -14,9 +14,9 @@ export default defineConfig({
         short_name: "UAP",
         description: "This is a PWA app built with Vite",
         start_url: "/",
-        display: "standalone",
-        background_color: "#ffffff",
-        theme_color: "#3e4eb8",
+        display: "fullscreen",
+        background_color: "#f3f4f6",
+        theme_color: "#111827",
         icons: [
           {
             src: "images/icon.png",
