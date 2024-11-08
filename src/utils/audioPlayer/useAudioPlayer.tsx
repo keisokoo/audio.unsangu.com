@@ -141,6 +141,21 @@ export class AudioPlayer {
     }
   };
 
+  public addCurrentTime = (time: number) => {
+    const currentTime = parseFloat(
+      (this.audioElement.currentTime * 1000).toFixed(2)
+    );
+    const newTime = time * 1000;
+    const nextTime = (currentTime + newTime) / 1000;
+    if (nextTime > this.audioElement.duration) {
+      this.audioElement.currentTime = this.audioElement.duration;
+    } else if (nextTime < 0) {
+      this.audioElement.currentTime = 0;
+    } else {
+      this.audioElement.currentTime = nextTime;
+    }
+  };
+
   public setLoopA = (currentTime: number) => {
     if (this.audioState.ALoop !== null) {
       this.setAudioState({
@@ -471,6 +486,14 @@ export const useAudioPlayer = (
     },
     [audioPlayer]
   );
+  const addCurrentTime = useCallback(
+    (time: number) => {
+      if (audioPlayer.current) {
+        audioPlayer.current.addCurrentTime(time);
+      }
+    },
+    [audioPlayer]
+  );
 
   useEffect(() => {
     return () => {
@@ -488,6 +511,7 @@ export const useAudioPlayer = (
     sourceItem,
     currentAudioStatus,
     togglePlay,
+    addCurrentTime,
     audioPlayer,
     loading,
     error,

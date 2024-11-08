@@ -43,6 +43,7 @@ export default function Home() {
     addAToBLoop,
     setLoop,
     deleteAToBLoop,
+    addCurrentTime,
   } = useAudioPlayer(
     audioElement.current,
     seekBarElement.current,
@@ -243,7 +244,9 @@ export default function Home() {
                   <div className="flex flex-row gap-4">
                     <ControlButton
                       icon={FaBackward}
-                      onClick={() => setPreviousAudio(sourceItem.id)}
+                      onClick={() => {
+                        addCurrentTime(-3);
+                      }}
                     />
                     <ControlButton
                       icon={currentAudioStatus.isPlaying ? FaPause : FaPlay}
@@ -251,7 +254,9 @@ export default function Home() {
                     />
                     <ControlButton
                       icon={FaForward}
-                      onClick={() => setNextAudio(sourceItem.id)}
+                      onClick={() => {
+                        addCurrentTime(3);
+                      }}
                     />
                   </div>
                   <div className="flex flex-row gap-4">
