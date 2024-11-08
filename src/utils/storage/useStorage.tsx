@@ -3,12 +3,20 @@ import { useCallback, useEffect, useState } from "react";
 import Storage, { Storable } from "./index";
 
 export function useStorage<T extends Storable>(
-  dbName: string,
-  storeName: string,
-  version: number = 1
+  defaultItem: Readonly<T>,
+  dbConfigs: {
+    dbName: string;
+    storeName: string;
+    version?: number;
+  }
 ) {
+  if (!dbConfigs.version) {
+    dbConfigs.version = 1;
+  }
+  const { dbName, storeName, version } = dbConfigs;
   const [storage] = useState(() => new Storage<T>(dbName, storeName, version));
   const [items, setItems] = useState<T[]>([]);
+  const [currentItem, setCurrentItem] = useState<T | null>(defaultItem);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -25,8 +33,12 @@ export function useStorage<T extends Storable>(
         const getAllRequest = store.getAll();
 
         getAllRequest.onsuccess = () => {
-          setItems(getAllRequest.result);
+          const allItems = getAllRequest.result;
+          setItems(allItems);
           setLoading(false);
+          if (allItems.length > 0) {
+            setCurrentItem(allItems[0]);
+          }
         };
         getAllRequest.onerror = () => {
           setError(getAllRequest.error);
@@ -45,15 +57,16 @@ export function useStorage<T extends Storable>(
 
   // CREATE: 데이터 추가 함수
   const addItem = useCallback(
-    async (item: Omit<T, "id">): Promise<T | null> => {
+    async (item: Omit<Partial<T>, "id">): Promise<T | null> => {
       setLoading(true);
       setError(null);
       try {
         const id = nanoid();
-        const newItem = { ...item, id } as T;
+        const newItem = { ...defaultItem, ...item, id } as T;
         await storage.add(newItem);
         setItems((prevItems) => [...prevItems, newItem]);
         setLoading(false);
+        setCurrentItem(newItem);
         return newItem;
       } catch (e) {
         setError(e as Error);
@@ -61,6 +74,7 @@ export function useStorage<T extends Storable>(
         return null;
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [storage]
   );
 
@@ -72,6 +86,7 @@ export function useStorage<T extends Storable>(
       try {
         const item = await storage.get(id);
         setLoading(false);
+        setCurrentItem(item);
         return item;
       } catch (e) {
         setError(e as Error);
@@ -95,6 +110,7 @@ export function useStorage<T extends Storable>(
           )
         );
         setLoading(false);
+        setCurrentItem(item);
       } catch (e) {
         setError(e as Error);
         setLoading(false);
@@ -112,6 +128,7 @@ export function useStorage<T extends Storable>(
         await storage.delete(id);
         setItems((prevItems) => prevItems.filter((item) => item.id !== id));
         setLoading(false);
+        setCurrentItem((prev) => (prev?.id === id ? null : prev));
       } catch (e) {
         setError(e as Error);
         setLoading(false);
@@ -126,6 +143,8 @@ export function useStorage<T extends Storable>(
   }, [fetchAllItems]);
 
   return {
+    currentItem,
+    setCurrentItem,
     items,
     loading,
     error,
