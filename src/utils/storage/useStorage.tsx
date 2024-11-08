@@ -126,15 +126,21 @@ export function useStorage<T extends Storable>(
       setError(null);
       try {
         await storage.delete(id);
-        setItems((prevItems) => prevItems.filter((item) => item.id !== id));
+        const newItems = items.filter((item) => item.id !== id);
+        setItems(newItems);
         setLoading(false);
-        setCurrentItem((prev) => (prev?.id === id ? null : prev));
+        setCurrentItem((prev) => {
+          if (prev?.id === id) {
+            return newItems[0] || null;
+          }
+          return prev;
+        });
       } catch (e) {
         setError(e as Error);
         setLoading(false);
       }
     },
-    [storage]
+    [storage, items]
   );
 
   // 처음에 모든 아이템 로드

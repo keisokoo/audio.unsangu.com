@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { currentTimeToHHMMSS } from "../helpers/parser";
 import { useStorage } from "../storage/useStorage";
@@ -6,6 +7,14 @@ export type AudioSourceItem = {
   id: string;
   fileName: string;
   src: string;
+  aToB: {
+    id: string;
+    title: string;
+    a: number;
+    b: number;
+    createdAt: ISOString;
+  }[];
+  index: number;
 };
 export type AudioStatus = {
   isPlaying: boolean;
@@ -28,6 +37,8 @@ export class AudioPlayer {
     duration: 0,
   };
   private audioState: AudioStatus = { ...this.defaultAudioStatus };
+  private isDragging: boolean = false;
+
   constructor(
     private audioElement: HTMLAudioElement,
     private seekBarElement: HTMLDivElement,
@@ -83,11 +94,37 @@ export class AudioPlayer {
       });
     });
 
-    this.seekBarElement.addEventListener("click", (e) => {
+    // 마우스 이벤트
+    this.seekBarElement.addEventListener("mousedown", (e) => {
+      this.isDragging = true;
       this.setCurrentTimeByXPosition(e.clientX);
     });
-    this.seekBarElement.addEventListener("touchmove", (e) => {
+
+    document.addEventListener("mousemove", (e) => {
+      if (this.isDragging) {
+        this.setCurrentTimeByXPosition(e.clientX);
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      this.isDragging = false;
+    });
+
+    // 터치 이벤트
+    this.seekBarElement.addEventListener("touchstart", (e) => {
+      this.isDragging = true;
       this.setCurrentTimeByXPosition(e.touches[0].clientX);
+    });
+
+    this.seekBarElement.addEventListener("touchmove", (e) => {
+      if (this.isDragging) {
+        e.preventDefault();
+        this.setCurrentTimeByXPosition(e.touches[0].clientX);
+      }
+    });
+
+    document.addEventListener("touchend", () => {
+      this.isDragging = false;
     });
   };
 
@@ -158,6 +195,13 @@ export class AudioPlayer {
     }
   };
 
+  public setLoop = (a: number, b: number) => {
+    this.setAudioState({
+      ALoop: a,
+      BLoop: b,
+    });
+  };
+
   public toggleLoop = () => {
     this.setAudioState({
       isLoop: !this.audioState.isLoop,
@@ -172,9 +216,24 @@ export class AudioPlayer {
   };
 
   public setPlaybackRate = (rate: number) => {
+    if (rate < 0) return;
+    if (rate > 2) return;
     this.audioElement.playbackRate = rate;
     this.setAudioState({
       playbackRate: rate,
+    });
+  };
+  public addPlaybackRate = (rate: number) => {
+    const currentRate = parseInt(
+      (this.audioElement.playbackRate * 100).toFixed(1)
+    );
+    const nextRate = rate * 100;
+    const newRate = (currentRate + nextRate) / 100;
+    if (newRate < 0) return;
+    if (newRate > 2) return;
+    this.audioElement.playbackRate = newRate;
+    this.setAudioState({
+      playbackRate: this.audioElement.playbackRate,
     });
   };
 
@@ -257,6 +316,7 @@ export const useAudioPlayer = (
       fileName: currentItem.name,
       src,
       index: items.findIndex((item) => item.id === currentItem.id),
+      aToB: currentItem.aToB,
     };
   }, [currentItem, items]);
 
@@ -352,13 +412,75 @@ export const useAudioPlayer = (
     }
   }, [audioPlayer]);
 
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      if (audioPlayer.current) {
+        audioPlayer.current.setPlaybackRate(rate);
+      }
+    },
+    [audioPlayer]
+  );
+  const addPlaybackRate = useCallback(
+    (rate: number) => {
+      if (audioPlayer.current) {
+        audioPlayer.current.addPlaybackRate(rate);
+      }
+    },
+    [audioPlayer]
+  );
+
+  const addAToBLoop = useCallback(() => {
+    if (!audioPlayer.current) return;
+    const { getStatus } = audioPlayer.current;
+    const { ALoop, BLoop } = getStatus();
+    if (ALoop === null || BLoop === null) return;
+    if (!currentItem) return;
+    const newItem = { ...currentItem };
+    if (!newItem?.aToB) {
+      newItem.aToB = [];
+    }
+    const uniqueTitle = `${currentTimeToHHMMSS(ALoop)} ~ ${currentTimeToHHMMSS(
+      BLoop
+    )}`;
+    if (newItem.aToB.find((item) => item.title === uniqueTitle)) return;
+    newItem.aToB.push({
+      id: nanoid(),
+      title: `${currentTimeToHHMMSS(ALoop)} ~ ${currentTimeToHHMMSS(BLoop)}`,
+      a: ALoop,
+      b: BLoop,
+      createdAt: new Date().toISOString(),
+    });
+    updateItem(newItem);
+  }, [updateItem, currentItem]);
+
+  const deleteAToBLoop = useCallback(
+    (id: string) => {
+      if (!currentItem) return;
+      const newItem = { ...currentItem };
+      newItem.aToB = newItem.aToB.filter((item) => item.id !== id);
+      updateItem(newItem);
+    },
+    [updateItem, currentItem]
+  );
+
+  const setLoop = useCallback(
+    (a: number, b: number) => {
+      if (audioPlayer.current) {
+        audioPlayer.current.setLoop(a, b);
+      }
+    },
+    [audioPlayer]
+  );
+
   useEffect(() => {
     return () => {
       if (prevBlobUrl.current) {
         URL.revokeObjectURL(prevBlobUrl.current);
         prevBlobUrl.current = null;
+        setCurrentItem(null);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
@@ -369,6 +491,8 @@ export const useAudioPlayer = (
     audioPlayer,
     loading,
     error,
+    setPlaybackRate,
+    addPlaybackRate,
     addItem,
     deleteItem,
     updateItem,
@@ -377,5 +501,8 @@ export const useAudioPlayer = (
     setCurrentItem,
     setTemporaryLoop,
     toggleLoop,
+    addAToBLoop,
+    setLoop,
+    deleteAToBLoop,
   };
 };
