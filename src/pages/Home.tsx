@@ -11,9 +11,7 @@ import {
 import {
   FaA,
   FaB,
-  FaBackward,
   FaClockRotateLeft,
-  FaForward,
   FaList,
   FaPause,
   FaPlay,
@@ -38,6 +36,7 @@ export default function Home() {
   const {
     sourceItem,
     addItem,
+    resetLoop,
     currentAudioStatus,
     togglePlay,
     items,
@@ -46,6 +45,7 @@ export default function Home() {
     setCurrentItem,
     setNextAudio,
     setTemporaryLoop,
+    addTemporaryLoop,
     toggleLoop,
     setPlaybackRate,
     addPlaybackRate,
@@ -53,12 +53,18 @@ export default function Home() {
     setLoop,
     deleteAToBLoops,
     addCurrentTime,
+    syncCurrentItem,
   } = useAudioPlayer(
     audioElement.current,
     seekBarElement.current,
     seekBarSeeker.current,
     timeRef.current
   );
+
+  const [values, setValues] = useState<{
+    currentAtoB: "a" | "b" | null;
+    addTime: number;
+  }>({ currentAtoB: null, addTime: 0.5 });
 
   useEffect(() => {
     function setViewportHeight() {
@@ -179,6 +185,8 @@ export default function Home() {
                 if (editMode === "sources") {
                   deleteItems(Array.from(selectedIds));
                 }
+                setSelectedIds(new Set());
+                setEditMode(null);
               }}
             />
           </div>
@@ -244,7 +252,11 @@ export default function Home() {
                 <FaPlus /> Audio
               </button>
               <button
-                onClick={() => setAtoBModalOpen(true)}
+                onClick={async () => {
+                  if (!sourceItem) return;
+                  await syncCurrentItem(sourceItem?.id || "");
+                  setAtoBModalOpen(true);
+                }}
                 className={clsx("px-4 py-2 rounded-md bg-slate-600", {
                   "opacity-50": !sourceItem?.aToB?.length,
                 })}
@@ -289,21 +301,19 @@ export default function Home() {
                       onClick={() => setPreviousAudio(sourceItem.id)}
                     />
                     <ControlButton
-                      icon={FaBackward}
-                      onClick={() => {
-                        addCurrentTime(-3);
-                      }}
-                    />
+                      onClick={() => addCurrentTime(-values.addTime)}
+                    >
+                      -{values.addTime}
+                    </ControlButton>
                     <ControlButton
                       icon={currentAudioStatus.isPlaying ? FaPause : FaPlay}
                       onClick={togglePlay}
                     />
                     <ControlButton
-                      icon={FaForward}
-                      onClick={() => {
-                        addCurrentTime(3);
-                      }}
-                    />
+                      onClick={() => addCurrentTime(values.addTime)}
+                    >
+                      +{values.addTime}
+                    </ControlButton>
                     <ControlButton
                       icon={FaFastForward}
                       onClick={() => setNextAudio(sourceItem.id)}
@@ -349,37 +359,98 @@ export default function Home() {
                   <div className="flex flex-row gap-4">
                     <ControlButton
                       icon={FaA}
-                      onClick={() => setTemporaryLoop("a")}
+                      onClick={() => {
+                        setTemporaryLoop("a");
+                      }}
                       color={
                         currentAudioStatus.ALoop !== null ? "red" : "white"
                       }
                     />
                     <ControlButton
                       icon={FaB}
-                      onClick={() => setTemporaryLoop("b")}
+                      onClick={() => {
+                        setTemporaryLoop("b");
+                      }}
                       color={
                         currentAudioStatus.BLoop !== null ? "red" : "white"
                       }
                     />
                     <ControlButton
-                      icon={FaRotate}
-                      onClick={toggleLoop}
-                      color={
-                        currentAudioStatus.ALoop !== null &&
-                        currentAudioStatus.BLoop !== null
-                          ? currentAudioStatus.isLoop
-                            ? "red"
-                            : "white"
-                          : "gray"
-                      }
+                      icon={FaClockRotateLeft}
+                      onClick={() => {
+                        resetLoop();
+                        setValues((prev) => ({
+                          ...prev,
+                          currentAtoB: null,
+                        }));
+                      }}
+                      color="white"
                     />
+                  </div>
+                  <div className="flex flex-row gap-4">
+                    <ControlButton
+                      onClick={() => {
+                        if (currentAudioStatus.ALoop === null) return;
+                        setValues((prev) => ({
+                          ...prev,
+                          currentAtoB: prev.currentAtoB === "a" ? null : "a",
+                        }));
+                      }}
+                      disabled={currentAudioStatus.ALoop === null}
+                      color={
+                        currentAudioStatus.ALoop === null
+                          ? "gray"
+                          : values.currentAtoB === "a"
+                          ? "cyan"
+                          : "white"
+                      }
+                    >
+                      A
+                    </ControlButton>
+                    <ControlButton
+                      onClick={() => {
+                        if (currentAudioStatus.BLoop === null) return;
+                        setValues((prev) => ({
+                          ...prev,
+                          currentAtoB: prev.currentAtoB === "b" ? null : "b",
+                        }));
+                      }}
+                      disabled={currentAudioStatus.BLoop === null}
+                      color={
+                        currentAudioStatus.BLoop === null
+                          ? "gray"
+                          : values.currentAtoB === "b"
+                          ? "cyan"
+                          : "white"
+                      }
+                    >
+                      B
+                    </ControlButton>
+                    <ControlButton
+                      onClick={() => {
+                        if (values.currentAtoB === null) return;
+                        addTemporaryLoop(values.currentAtoB, -values.addTime);
+                      }}
+                      color={values.currentAtoB ? "white" : "gray"}
+                    >
+                      -{values.addTime}
+                    </ControlButton>
+                    <ControlButton
+                      onClick={() => {
+                        if (values.currentAtoB === null) return;
+                        addTemporaryLoop(values.currentAtoB, values.addTime);
+                      }}
+                      color={values.currentAtoB ? "white" : "gray"}
+                    >
+                      {values.addTime}
+                    </ControlButton>
                   </div>
                   <div className="flex flex-row gap-4 w-full">
                     <ControlButton
                       className="flex-1 gap-2"
                       icon={FaPlus}
                       onClick={addAToBLoop}
-                      size={24}
+                      size={16}
                       disabled={
                         currentAudioStatus.ALoop === null ||
                         currentAudioStatus.BLoop === null
@@ -401,6 +472,11 @@ export default function Home() {
                         Add Loop
                       </div>
                     </ControlButton>
+                    <ControlButton
+                      icon={FaRotate}
+                      onClick={toggleLoop}
+                      color={currentAudioStatus.isLoop ? "red" : "white"}
+                    />
                   </div>
                 </div>
               </>

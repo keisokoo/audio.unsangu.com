@@ -14,7 +14,6 @@ export type AudioSourceItem = {
     b: number;
     createdAt: ISOString;
   }[];
-  index: number;
 };
 export type AudioStatus = {
   isPlaying: boolean;
@@ -60,7 +59,10 @@ export class AudioPlayer {
     const percentage = (x / rect.width) * 100;
     this.seekBarSeeker.style.width = `${percentage}%`;
   };
-
+  public updateCurrentTime = (currentTime: number) => {
+    this.audioElement.currentTime = currentTime;
+    this.setSeekerWidth(currentTime);
+  };
   private setCurrentTimeByXPosition = (xPosition: number) => {
     const rect = this.seekBarElement.getBoundingClientRect();
     const x = xPosition - rect.left;
@@ -77,10 +79,12 @@ export class AudioPlayer {
       );
     });
     this.audioElement.addEventListener("ended", () => {
-      if (this.audioState.isLoop && this.audioState.ALoop !== null) {
-        this.audioElement.currentTime = this.audioState.ALoop;
+      if (this.audioState.isLoop) {
+        this.audioElement.currentTime = this.audioState.ALoop || 0;
         this.setSeekerWidth(0);
         this.currentTimeElement.textContent = currentTimeToHHMMSS(0);
+        this.audioElement.play();
+      } else {
         this.setAudioState({
           isPlaying: false,
         });
@@ -129,14 +133,14 @@ export class AudioPlayer {
   };
 
   private loopHandler = (currentTime: number) => {
-    if (this.audioState.isLoop && this.audioState.ALoop !== null) {
+    if (this.audioState.isLoop) {
       if (
         this.audioState.BLoop !== null &&
         currentTime >= this.audioState.BLoop
       ) {
-        this.audioElement.currentTime = this.audioState.ALoop;
-      } else if (currentTime <= this.audioState.ALoop) {
-        this.audioElement.currentTime = this.audioState.ALoop;
+        this.audioElement.currentTime = this.audioState.ALoop || 0;
+      } else if (currentTime <= (this.audioState.ALoop || 0)) {
+        this.audioElement.currentTime = this.audioState.ALoop || 0;
       }
     }
   };
@@ -157,45 +161,38 @@ export class AudioPlayer {
   };
 
   public setLoopA = (currentTime: number) => {
-    if (this.audioState.ALoop !== null) {
-      this.setAudioState({
-        ALoop: null,
-      });
-    } else {
-      if (
-        this.audioState.BLoop !== null &&
-        currentTime >= this.audioState.BLoop
-      ) {
-        this.setAudioState({
-          ALoop: currentTime,
-          BLoop: null,
-        });
-        return;
-      }
+    if (
+      this.audioState.BLoop !== null &&
+      currentTime >= this.audioState.BLoop
+    ) {
       this.setAudioState({
         ALoop: currentTime,
+        BLoop: null,
       });
+      return;
     }
+    this.setAudioState({
+      ALoop: currentTime,
+    });
   };
 
   public setLoopB = (currentTime: number) => {
-    if (this.audioState.BLoop !== null) {
-      this.setAudioState({
-        BLoop: null,
-      });
-    } else {
-      if (
-        this.audioState.ALoop !== null &&
-        currentTime <= this.audioState.ALoop
-      ) {
-        return;
-      }
-      this.setAudioState({
-        BLoop: currentTime,
-      });
+    if (
+      this.audioState.ALoop !== null &&
+      currentTime <= this.audioState.ALoop
+    ) {
+      return;
     }
+    this.setAudioState({
+      BLoop: currentTime,
+    });
   };
-
+  public resetLoop = () => {
+    this.setAudioState({
+      ALoop: null,
+      BLoop: null,
+    });
+  };
   public togglePlay = () => {
     if (!this.audioState.isPlaying) {
       this.audioElement.play();
@@ -299,6 +296,7 @@ export const useAudioPlayer = (
     items,
     loading,
     error,
+    getItem,
     addItem,
     deleteItem,
     deleteItems,
@@ -331,10 +329,9 @@ export const useAudioPlayer = (
       id: currentItem.id,
       fileName: currentItem.name,
       src,
-      index: items.findIndex((item) => item.id === currentItem.id),
       aToB: currentItem.aToB,
     };
-  }, [currentItem, items]);
+  }, [currentItem]);
 
   const [currentAudioStatus, setCurrentAudioStatus] = useState<AudioStatus>({
     isPlaying: false,
@@ -370,9 +367,22 @@ export const useAudioPlayer = (
     };
   }, [audioElement, seekBarElement, seekBarSeeker, currentTimeElement]);
 
+  const syncCurrentItem = useCallback(
+    async (itemId: string) => {
+      await getItem(itemId);
+    },
+    [getItem]
+  );
+
   const togglePlay = useCallback(() => {
     if (audioPlayer.current) {
       audioPlayer.current.togglePlay();
+    }
+  }, [audioPlayer]);
+
+  const resetLoop = useCallback(() => {
+    if (audioPlayer.current) {
+      audioPlayer.current.resetLoop();
     }
   }, [audioPlayer]);
 
@@ -409,10 +419,24 @@ export const useAudioPlayer = (
     },
     [items, setCurrentItem]
   );
-  const setTemporaryLoop = useCallback(
-    (target: "a" | "b") => {
+  const addTemporaryLoop = useCallback(
+    (target: "a" | "b", add: number = 0) => {
       if (audioPlayer.current && audioElement) {
-        const time = audioElement.currentTime;
+        const time = currentAudioStatus[target === "a" ? "ALoop" : "BLoop"];
+        if (time === null) return;
+        if (target === "a") {
+          audioPlayer.current.setLoopA(time + add);
+        } else {
+          audioPlayer.current.setLoopB(time + add);
+        }
+      }
+    },
+    [audioPlayer, audioElement, currentAudioStatus]
+  );
+  const setTemporaryLoop = useCallback(
+    (target: "a" | "b", add: number = 0) => {
+      if (audioPlayer.current && audioElement) {
+        const time = audioElement.currentTime + add;
         if (target === "a") {
           audioPlayer.current.setLoopA(time);
         } else {
@@ -531,6 +555,7 @@ export const useAudioPlayer = (
     addItem,
     deleteItem,
     updateItem,
+    syncCurrentItem,
     setPreviousAudio,
     setNextAudio,
     setCurrentItem,
@@ -541,5 +566,7 @@ export const useAudioPlayer = (
     deleteAToBLoop,
     deleteAToBLoops,
     deleteItems,
+    resetLoop,
+    addTemporaryLoop,
   };
 };

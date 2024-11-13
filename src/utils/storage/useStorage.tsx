@@ -99,7 +99,7 @@ export function useStorage<T extends Storable>(
 
   // UPDATE: 데이터 업데이트 함수
   const updateItem = useCallback(
-    async (item: T) => {
+    async (item: T, updateCurrentItem: boolean = false) => {
       setLoading(true);
       setError(null);
       try {
@@ -110,7 +110,9 @@ export function useStorage<T extends Storable>(
           )
         );
         setLoading(false);
-        setCurrentItem(item);
+        if (updateCurrentItem) {
+          setCurrentItem(item);
+        }
       } catch (e) {
         setError(e as Error);
         setLoading(false);

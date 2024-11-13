@@ -5,7 +5,7 @@ interface ControlButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: number;
   color?: string;
-  icon: IconType;
+  icon?: IconType;
   onClick: () => void;
   children?: React.ReactNode;
 }
@@ -26,9 +26,10 @@ export default function ControlButton({
         className
       )}
       onClick={onClick}
+      style={{ color }}
       {...props}
     >
-      <Icon size={size} color={color} />
+      {Icon && <Icon size={size} color={color} />}
       {children}
     </button>
   );
