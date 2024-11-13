@@ -143,6 +143,31 @@ export function useStorage<T extends Storable>(
     [storage, items]
   );
 
+  const deleteItems = useCallback(
+    async (ids: string[]) => {
+      setLoading(true);
+      setError(null);
+      try {
+        ids.forEach(async (id) => {
+          await storage.delete(id);
+        });
+        const newItems = items.filter((item) => !ids.includes(item.id));
+        setItems(newItems);
+        setCurrentItem((prev) => {
+          if (prev && ids.includes(prev.id)) {
+            return newItems[0] || null;
+          }
+          return prev;
+        });
+        setLoading(false);
+      } catch (e) {
+        setError(e as Error);
+        setLoading(false);
+      }
+    },
+    [storage, items]
+  );
+
   // 처음에 모든 아이템 로드
   useEffect(() => {
     fetchAllItems();
@@ -158,6 +183,7 @@ export function useStorage<T extends Storable>(
     getItem,
     updateItem,
     deleteItem,
+    deleteItems,
     fetchAllItems,
   };
 }

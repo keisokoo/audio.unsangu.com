@@ -1,6 +1,13 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FaCircle, FaMinusCircle, FaPlusCircle } from "react-icons/fa";
+import {
+  FaCircle,
+  FaFastBackward,
+  FaFastForward,
+  FaMinusCircle,
+  FaPlusCircle,
+  FaTimes,
+} from "react-icons/fa";
 import {
   FaA,
   FaB,
@@ -15,7 +22,9 @@ import {
   FaTrash,
 } from "react-icons/fa6";
 import ControlButton from "../components/ControlButton";
+import ListItem from "../components/ListItem";
 import Modal from "../components/Modal";
+import TopButton from "../components/TopButton";
 import { useAudioPlayer } from "../utils/audioPlayer/useAudioPlayer";
 import { currentTimeToHHMMSS } from "../utils/helpers/parser";
 import "./styles.css";
@@ -33,7 +42,7 @@ export default function Home() {
     togglePlay,
     items,
     setPreviousAudio,
-    deleteItem,
+    deleteItems,
     setCurrentItem,
     setNextAudio,
     setTemporaryLoop,
@@ -42,7 +51,7 @@ export default function Home() {
     addPlaybackRate,
     addAToBLoop,
     setLoop,
-    deleteAToBLoop,
+    deleteAToBLoops,
     addCurrentTime,
   } = useAudioPlayer(
     audioElement.current,
@@ -86,110 +95,139 @@ export default function Home() {
 
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [aToBModalOpen, setAtoBModalOpen] = useState<boolean>(false);
-  const [isOverflow, setIsOverflow] = useState<boolean>(false);
   const titleRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(true);
-  const [direction, setDirection] = useState<"right" | "left">("left");
-  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
-  useEffect(() => {
-    const marqueeText = titleRef.current;
-    if (marqueeText) {
-      const isOverflowing = marqueeText.scrollWidth > marqueeText.clientWidth;
-      setIsOverflow(isOverflowing);
+  const handleStart = (clientX: number) => {
+    setIsDragging(true);
+    setStartX(clientX - (titleRef.current?.offsetLeft || 0));
+    setScrollLeft(titleRef.current?.scrollLeft || 0);
+  };
 
-      if (isOverflowing && isScrolling && !isPaused) {
-        const scrollWidth = marqueeText.scrollWidth - marqueeText.clientWidth;
-        const animate = () => {
-          setScrollPosition((prev) => {
-            const step = direction === "left" ? 1 : -1;
-            const newPosition = prev + step;
+  const handleEnd = () => {
+    setIsDragging(false);
+  };
 
-            if (newPosition >= scrollWidth) {
-              setIsPaused(true);
-              setTimeout(() => {
-                setDirection("right");
-                setIsPaused(false);
-              }, 1500);
-              return scrollWidth;
-            }
-            if (newPosition <= 0) {
-              setIsPaused(true);
-              setTimeout(() => {
-                setDirection("left");
-                setIsPaused(false);
-              }, 1500);
-              return 0;
-            }
-            return newPosition;
-          });
-          animationRef.current = requestAnimationFrame(animate);
-        };
-        animationRef.current = requestAnimationFrame(animate);
-
-        return () => {
-          if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-          }
-        };
-      }
+  const handleMove = (clientX: number) => {
+    if (!isDragging) return;
+    const x = clientX - (titleRef.current?.offsetLeft || 0);
+    const walk = (x - startX) * 1;
+    if (titleRef.current) {
+      titleRef.current.scrollLeft = scrollLeft - walk;
     }
-  }, [sourceItem?.fileName, isScrolling, direction, isPaused]);
+  };
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    handleStart(e.pageX);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    handleMove(e.pageX);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    handleStart(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    handleMove(e.touches[0].clientX);
+  };
+
+  const [editMode, setEditMode] = useState<"sources" | "loop" | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleEditMode = (mode: "sources" | "loop" | null, itemId?: string) => {
+    setEditMode(mode);
+    if (itemId) {
+      setSelectedIds(new Set([itemId]));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
   return (
     <>
+      <div
+        className={clsx("fixed top-0 left-0 w-full z-[51]", {
+          "-translate-y-full": editMode === null,
+          "translate-y-0": editMode !== null,
+        })}
+      >
+        <div className="w-full p-4 flex justify-between items-center bg-slate-200 text-slate-700">
+          <TopButton icon={FaTimes} onClick={() => handleEditMode(null)} />
+          <div className="flex gap-2 items-center flex-1 justify-end">
+            <TopButton
+              icon={FaTrash}
+              color={selectedIds.size > 0 ? "#a80f0f" : "#a6a6a6cc"}
+              onClick={() => {
+                if (editMode === "loop") {
+                  deleteAToBLoops(Array.from(selectedIds));
+                }
+                if (editMode === "sources") {
+                  deleteItems(Array.from(selectedIds));
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
         {items.length > 0 && (
           <div className="flex flex-col gap-1 pb-4 max-h-[300px] overflow-y-auto">
             {items.map((item) => (
-              <div
+              <ListItem
                 key={item.id}
-                className="text-sm cursor-pointer flex justify-between px-4 py-2 gap-2 overflow-hidden text-ellipsis"
+                item={item}
                 onClick={() => {
-                  setCurrentItem(item);
-                  setModalOpen(false);
+                  if (editMode === "sources") {
+                    toggleSelected(item.id);
+                  } else {
+                    setCurrentItem(item);
+                    setModalOpen(false);
+                  }
                 }}
-              >
-                <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-                  {item.name || "Unknown"}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteItem(item.id);
-                  }}
-                >
-                  <FaTrash />
-                </button>
-              </div>
+                onEditMode={() => {
+                  handleEditMode("sources", item.id);
+                }}
+                selected={selectedIds.has(item.id)}
+                selectedMode={editMode === "sources"}
+              />
             ))}
           </div>
         )}
       </Modal>
       <Modal open={aToBModalOpen} onClose={() => setAtoBModalOpen(false)}>
         {sourceItem?.aToB?.map((item) => (
-          <div
+          <ListItem
             key={item.id}
-            className="text-sm cursor-pointer flex justify-between px-4 py-2 gap-2 overflow-hidden text-ellipsis"
+            item={item}
             onClick={() => {
-              setLoop(item.a, item.b);
-              setAtoBModalOpen(false);
+              if (editMode === "loop") {
+                toggleSelected(item.id);
+              } else {
+                setLoop(item.a, item.b);
+                setAtoBModalOpen(false);
+              }
             }}
-          >
-            <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-              {item.title || "Unknown"}
-            </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteAToBLoop(item.id);
-              }}
-            >
-              <FaTrash />
-            </button>
-          </div>
+            onEditMode={() => {
+              handleEditMode("loop", item.id);
+            }}
+            selected={selectedIds.has(item.id)}
+            selectedMode={editMode === "loop"}
+          />
         ))}
       </Modal>
       <div className="main-container">
@@ -225,15 +263,19 @@ export default function Home() {
               </button>
             </div>
           </div>
-          <div ref={titleRef} className="text-lg marquee-container py-4 px-4">
-            <div
-              className="marquee-text"
-              style={{
-                transform: `translateX(-${scrollPosition}px)`,
-                cursor: isOverflow ? "pointer" : "default",
-              }}
-              onClick={() => setIsScrolling(!isScrolling)}
-            >
+          <div
+            ref={titleRef}
+            className="text-lg w-full overflow-x-auto no-scrollbar cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleEnd}
+            onMouseLeave={handleEnd}
+            onMouseMove={handleMouseMove}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleEnd}
+            onTouchCancel={handleEnd}
+            onTouchMove={handleTouchMove}
+          >
+            <div className="py-4 px-4 whitespace-nowrap inline-block">
               {sourceItem ? sourceItem?.fileName : "등록된 오디오가 없습니다."}
             </div>
           </div>
@@ -242,6 +284,10 @@ export default function Home() {
               <>
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex flex-row gap-4">
+                    <ControlButton
+                      icon={FaFastBackward}
+                      onClick={() => setPreviousAudio(sourceItem.id)}
+                    />
                     <ControlButton
                       icon={FaBackward}
                       onClick={() => {
@@ -257,6 +303,10 @@ export default function Home() {
                       onClick={() => {
                         addCurrentTime(3);
                       }}
+                    />
+                    <ControlButton
+                      icon={FaFastForward}
+                      onClick={() => setNextAudio(sourceItem.id)}
                     />
                   </div>
                   <div className="flex flex-row gap-4">

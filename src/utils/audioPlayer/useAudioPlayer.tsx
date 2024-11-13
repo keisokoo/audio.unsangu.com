@@ -301,6 +301,7 @@ export const useAudioPlayer = (
     error,
     addItem,
     deleteItem,
+    deleteItems,
     updateItem,
   } = useStorage<Item>(initialItem, {
     dbName: "test",
@@ -478,6 +479,16 @@ export const useAudioPlayer = (
     [updateItem, currentItem]
   );
 
+  const deleteAToBLoops = useCallback(
+    (ids: string[]) => {
+      if (!currentItem) return;
+      const newItem = { ...currentItem };
+      newItem.aToB = newItem.aToB.filter((item) => !ids.includes(item.id));
+      updateItem(newItem);
+    },
+    [updateItem, currentItem]
+  );
+
   const setLoop = useCallback(
     (a: number, b: number) => {
       if (audioPlayer.current) {
@@ -528,5 +539,7 @@ export const useAudioPlayer = (
     addAToBLoop,
     setLoop,
     deleteAToBLoop,
+    deleteAToBLoops,
+    deleteItems,
   };
 };

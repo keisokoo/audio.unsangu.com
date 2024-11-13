@@ -45,13 +45,12 @@
   padding-bottom: 54px;
 }
 
-.marquee-container {
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
+/* 스크롤바 숨기기 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-.marquee-text {
-  display: inline-block;
-  /* transition: transform 0.1s linear; */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
