@@ -1,6 +1,11 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { currentTimeToHHMMSS } from "../helpers/parser";
+import {
+  audioDbConfigs,
+  audioInitialItem,
+  AudioItemType,
+} from "../storage/audioStorage";
 import { useStorage } from "../storage/useStorage";
 
 export type AudioSourceItem = {
@@ -266,24 +271,6 @@ export class AudioPlayer {
 }
 
 export type ISOString = string;
-export interface Item {
-  id: string;
-  name: string;
-  audioFile: File | null;
-  aToB: {
-    id: string;
-    title: string;
-    a: number;
-    b: number;
-    createdAt: ISOString;
-  }[];
-}
-const initialItem: Readonly<Item> = {
-  id: "",
-  name: "",
-  audioFile: null,
-  aToB: [],
-};
 export const useAudioPlayer = (
   audioElement: HTMLAudioElement | null,
   seekBarElement: HTMLDivElement | null,
@@ -301,11 +288,7 @@ export const useAudioPlayer = (
     deleteItem,
     deleteItems,
     updateItem,
-  } = useStorage<Item>(initialItem, {
-    dbName: "test",
-    storeName: "test",
-    version: 1,
-  });
+  } = useStorage<AudioItemType>(audioInitialItem, audioDbConfigs);
   const audioPlayer = useRef<AudioPlayer | null>(null);
 
   // 이전 blob URL을 저장할 ref 추가
